@@ -43,13 +43,14 @@ loadEnv($envPath);
 
 function dbConfig(): array
 {
-    return [
-        'host' => getenv('DB_HOST') ?: 'localhost',
-        'name' => getenv('DB_NAME') ?: 'defaultdb',
-        'user' => getenv('DB_USERNAME') ?: 'root',
-        'pass' => getenv('DB_PASSWORD') ?: '',
-        'charset' => 'utf8mb4',
-    ];
+   return [
+      'host' => getenv('DB_HOST') ?: '127.0.0.1',
+      'port' => getenv('DB_PORT') ?: '3306',
+      'name' => getenv('DB_NAME') ?: 'portfolio_system',
+      'user' => getenv('DB_USERNAME') ?: 'root',
+      'pass' => getenv('DB_PASSWORD') ?: '',
+      'charset' => 'utf8mb4',
+   ];
 }
 
 function getDBConnection(): PDO
@@ -62,10 +63,11 @@ function getDBConnection(): PDO
 
     $config = dbConfig();
     $dsn = sprintf(
-        'mysql:host=%s;dbname=%s;charset=%s',
-        $config['host'],
-        $config['name'],
-        $config['charset']
+       'mysql:host=%s;port=%s;dbname=%s;charset=%s',
+       $config['host'],
+       $config['port'],
+       $config['name'],
+       $config['charset']
     );
 
     $options = [
