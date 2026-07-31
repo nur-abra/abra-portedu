@@ -15,7 +15,13 @@ function redirect(string $url): never
 
 function baseUrl(): string
 {
-    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $isHttps =
+        (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+        (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') ||
+        (($_SERVER['HTTP_X_FORWARDED_SSL'] ?? '') === 'on');
+
+    $scheme = $isHttps ? 'https' : 'http';
+
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
     $script = dirname($_SERVER['SCRIPT_NAME'] ?? '');
     $script = str_replace('\\', '/', $script);
@@ -26,7 +32,9 @@ function baseUrl(): string
         $script = rtrim(str_replace('\\', '/', $script), '/');
     }
 
-    return $script === '/' || $script === '.' || $script === '' ? "$scheme://$host" : "$scheme://$host$script";
+    return $script === '/' || $script === '.' || $script === ''
+        ? "$scheme://$host"
+        : "$scheme://$host$script";
 }
 
 function assetUrl(string $path): string
