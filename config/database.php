@@ -45,7 +45,7 @@ function dbConfig(): array
 {
     return [
         'host' => getenv('DB_HOST') ?: 'localhost',
-        'name' => getenv('DB_NAME') ?: 'portfolio_system',
+        'name' => getenv('DB_NAME') ?: 'defaultdb',
         'user' => getenv('DB_USERNAME') ?: 'root',
         'pass' => getenv('DB_PASSWORD') ?: '',
         'charset' => 'utf8mb4',
