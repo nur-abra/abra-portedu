@@ -49,7 +49,7 @@ require_once __DIR__ . '/includes/header.php';
                 <div class="col-md-6 col-lg-4">
                     <div class="card project-card h-100 shadow-sm border-0">
                         <?php if (!empty($project['image_path'])): ?>
-                            <img src="<?= e(uploadUrl(basename($project['image_path']))) ?>" class="card-img-top gallery-thumb" alt="<?= e($project['title']) ?>" data-title="<?= e($project['title']) ?>">
+                            <img src="<?= e(uploadUrl($project['image_path'])) ?>" class="card-img-top gallery-thumb" alt="<?= e($project['title']) ?>" data-title="<?= e($project['title']) ?>">
                         <?php else: ?>
                             <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height:200px">
                                 <i class="bi bi-code-square display-3 text-primary"></i>
@@ -94,7 +94,7 @@ require_once __DIR__ . '/includes/header.php';
                 <?php foreach ($images as $image): ?>
                 <div class="col-6 col-md-4 col-lg-3">
                     <div class="gallery-item position-relative overflow-hidden rounded shadow-sm">
-                        <img src="<?= e(uploadUrl(basename($image['image_path']))) ?>"
+                        <img src="<?= e(uploadUrl($image['image_path'])) ?>"
                              alt="<?= e($image['title']) ?>"
                              class="img-fluid w-100 gallery-thumb"
                              data-title="<?= e($image['title']) ?>"

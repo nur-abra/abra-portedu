@@ -64,11 +64,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = (int) ($_POST['id'] ?? 0);
 
             if ($action === 'delete' && $id > 0) {
-                $stmt = $pdo->prepare('SELECT image_path FROM projects WHERE id = ?');
+                $stmt = $pdo->prepare('SELECT image_path, cloudinary_public_id FROM projects WHERE id = ?');
                 $stmt->execute([$id]);
                 $proj = $stmt->fetch();
                 if ($proj && $proj['image_path']) {
-                    deleteUploadedFile($proj['image_path']);
+                    deleteUploadedFile($proj['cloudinary_public_id']);
                 }
                 $pdo->prepare('DELETE FROM projects WHERE id = ?')->execute([$id]);
                 setFlash('success', 'Project deleted.');
@@ -80,35 +80,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $technologies = sanitizeString($_POST['technologies'] ?? '', 255);
             $projectLink = sanitizeString($_POST['project_link'] ?? '', 255);
             $imagePath = null;
+            $cloudinaryPublicId = null;
 
             if (!empty($_FILES['project_image']['name'])) {
                 $upload = saveUploadedImage($_FILES['project_image'], 'project');
                 if (!$upload['valid']) {
                     $error = $upload['error'];
                 } else {
-                    $imagePath = $upload['path'];
+                   $imagePath = $upload['path'];
+                   $cloudinaryPublicId = $upload['filename'];
                 }
             }
 
             if ($error === '' && $title !== '') {
                 if ($action === 'update' && $id > 0) {
                     if ($imagePath) {
-                        $old = $pdo->prepare('SELECT image_path FROM projects WHERE id = ?');
+                        $old = $pdo->prepare('SELECT image_path, cloudinary_public_id FROM projects WHERE id = ?');
                         $old->execute([$id]);
                         $oldProj = $old->fetch();
                         if ($oldProj && $oldProj['image_path']) {
-                            deleteUploadedFile($oldProj['image_path']);
+                            deleteUploadedFile($oldProj['cloudinary_public_id']);
                         }
-                        $pdo->prepare('UPDATE projects SET title=?, description=?, technologies=?, project_link=?, image_path=? WHERE id=?')
-                            ->execute([$title, $description, $technologies, $projectLink, $imagePath, $id]);
+                        $pdo->prepare('UPDATE projects SET title=?, description=?, technologies=?, project_link=?, image_path=?, cloudinary_public_id=? WHERE id=?')
+                            ->execute([$title, $description, $technologies, $projectLink, $imagePath, $cloudinaryPublicId, $id]);
                     } else {
                         $pdo->prepare('UPDATE projects SET title=?, description=?, technologies=?, project_link=? WHERE id=?')
                             ->execute([$title, $description, $technologies, $projectLink, $id]);
                     }
                     setFlash('success', 'Project updated.');
                 } else {
-                    $pdo->prepare('INSERT INTO projects (title, description, technologies, project_link, image_path) VALUES (?,?,?,?,?)')
-                        ->execute([$title, $description, $technologies, $projectLink, $imagePath]);
+                    $pdo->prepare('INSERT INTO projects (title, description, technologies, project_link, image_path, cloudinary_public_id) VALUES (?,?,?,?,?,?)')
+                        ->execute([$title, $description, $technologies, $projectLink, $imagePath, $cloudinaryPublicId]);
                     setFlash('success', 'Project added.');
                 }
                 redirect(baseUrl() . '/admin/manage-content.php?tab=projects');
@@ -121,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $editProject = null;
 if (isset($_GET['edit_project'])) {
-    $stmt = $pdo->prepare('SELECT * FROM projects WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT image_path FROM projects WHERE id = ?');
     $stmt->execute([(int) $_GET['edit_project']]);
     $editProject = $stmt->fetch() ?: null;
     $tab = 'projects';

@@ -61,7 +61,7 @@ require_once __DIR__ . '/includes/header.php';
                 <div class="col-md-4">
                     <div class="card project-card h-100 shadow-sm border-0">
                         <?php if (!empty($project['image_path'])): ?>
-                            <img src="<?= e(uploadUrl(basename($project['image_path']))) ?>" class="card-img-top" alt="<?= e($project['title']) ?>">
+                            <img src="<?= e(uploadUrl($project['image_path'])) ?>" class="card-img-top" alt="<?= e($project['title']) ?>">
                         <?php else: ?>
                             <div class="card-img-top bg-primary bg-opacity-10 d-flex align-items-center justify-content-center" style="height:180px">
                                 <i class="bi bi-folder2-open display-4 text-primary"></i>

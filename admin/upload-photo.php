@@ -26,11 +26,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'delete') {
         $id = (int) ($_POST['id'] ?? 0);
-        $stmt = $pdo->prepare('SELECT image_path FROM portfolio_images WHERE id = ?');
+        $stmt = $pdo->prepare('SELECT image_path, cloudinary_public_id FROM portfolio_images WHERE id = ?');
         $stmt->execute([$id]);
         $img = $stmt->fetch();
         if ($img) {
-            deleteUploadedFile($img['image_path']);
+            deleteUploadedFile($img['cloudinary_public_id']);
             $pdo->prepare('DELETE FROM portfolio_images WHERE id = ?')->execute([$id]);
             setFlash('success', 'Image deleted successfully.');
         }
@@ -48,39 +48,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Invalid category selected.';
     } else {
         $imagePath = null;
+        $cloudinaryPublicId = null;
 
         if (!empty($_FILES['image']['name'])) {
             $upload = saveUploadedImage($_FILES['image'], 'portfolio');
+
             if (!$upload['valid']) {
                 $error = $upload['error'];
             } else {
-                $imagePath = $upload['path'];
+               $imagePath = $upload['path'];
+               $cloudinaryPublicId = $upload['filename'];    
             }
+
         }
 
         if ($error === '') {
             if ($action === 'update' && $id > 0) {
                 if ($imagePath) {
-                    $old = $pdo->prepare('SELECT image_path FROM portfolio_images WHERE id = ?');
+                    $old = $pdo->prepare('SELECT image_path, cloudinary_public_id FROM portfolio_images WHERE id = ?');
                     $old->execute([$id]);
                     $oldImg = $old->fetch();
                     if ($oldImg) {
-                        deleteUploadedFile($oldImg['image_path']);
+                        deleteUploadedFile($oldImg['cloudinary_public_id']);
                     }
-                    $pdo->prepare('UPDATE portfolio_images SET title = ?, description = ?, category = ?, image_path = ? WHERE id = ?')
-                        ->execute([$title, $description, $category, $imagePath, $id]);
+                    
+                    $pdo->prepare('UPDATE portfolio_images SET title=?, description=?, category=?, image_path=?, cloudinary_public_id=? WHERE id=?')
+                        ->execute([$title, $description, $category, $imagePath, $cloudinaryPublicId, $id]);
                 } else {
-                    $pdo->prepare('UPDATE portfolio_images SET title = ?, description = ?, category = ? WHERE id = ?')
+                    $pdo->prepare('UPDATE portfolio_images SET title=?, description=?, category=? WHERE id=?')
                         ->execute([$title, $description, $category, $id]);
                 }
                 setFlash('success', 'Image updated successfully.');
             } else {
                 if (!$imagePath) {
-                    $error = 'Please upload an image.';
+                   $error = 'Please upload an image.';
                 } else {
-                    $pdo->prepare('INSERT INTO portfolio_images (title, description, image_path, category) VALUES (?, ?, ?, ?)')
-                        ->execute([$title, $description, $imagePath, $category]);
-                    setFlash('success', 'Image uploaded successfully.');
+                   $pdo->prepare( 'INSERT INTO portfolio_images (title, description, image_path, category, cloudinary_public_id) VALUES (?, ?, ?, ?, ?)')
+                       ->execute([ $title, $description, $imagePath, $category, $cloudinaryPublicId ]);
+
+                   setFlash('success', 'Image uploaded successfully.');
                 }
             }
 
@@ -184,7 +190,7 @@ require_once dirname(__DIR__) . '/includes/admin-header.php';
                                 <?php foreach ($images as $img): ?>
                                 <tr>
                                     <td>
-                                        <img src="<?= e(uploadUrl(basename($img['image_path']))) ?>" alt="" class="rounded" style="width:60px;height:60px;object-fit:cover">
+                                        <img src="<?= e(uploadUrl($img['image_path'])) ?>" alt="" class="rounded" style="width:60px;height:60px;object-fit:cover">
                                     </td>
                                     <td><?= e($img['title']) ?></td>
                                     <td><span class="badge bg-primary"><?= e($img['category']) ?></span></td>

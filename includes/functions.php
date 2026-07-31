@@ -42,8 +42,16 @@ function assetUrl(string $path): string
     return baseUrl() . '/assets/' . ltrim($path, '/');
 }
 
-function uploadUrl(string $path): string
+function uploadUrl(?string $path): string
 {
+    if (empty($path)) {
+        return '';
+    }
+
+    if (filter_var($path, FILTER_VALIDATE_URL)) {
+        return $path;
+    }
+
     return baseUrl() . '/uploads/' . ltrim($path, '/');
 }
 
@@ -155,41 +163,140 @@ function validateUploadedImage(array $file, int $maxSize = 5242880): array
 function saveUploadedImage(array $file, string $prefix = 'img'): array
 {
     $validation = validateUploadedImage($file);
+
     if (!$validation['valid']) {
         return $validation;
     }
 
-    $uploadDir = dirname(__DIR__) . '/uploads';
-    if (!is_dir($uploadDir)) {
-        mkdir($uploadDir, 0755, true);
+    $cloudName = getenv('CLOUDINARY_CLOUD_NAME');
+    $apiKey = getenv('CLOUDINARY_API_KEY');
+    $apiSecret = getenv('CLOUDINARY_API_SECRET');
+
+    if (!$cloudName || !$apiKey || !$apiSecret) {
+        return [
+            'valid' => false,
+            'error' => 'Cloudinary environment variables are not configured.'
+        ];
     }
 
-    $filename = sprintf('%s_%s.%s', $prefix, bin2hex(random_bytes(8)), $validation['extension']);
-    $destination = $uploadDir . '/' . $filename;
+    $timestamp = time();
 
-    if (!move_uploaded_file($file['tmp_name'], $destination)) {
-        return ['valid' => false, 'error' => 'Failed to save uploaded file.'];
+    $publicId = sprintf(
+        'portfolio/%s_%s',
+        $prefix,
+        bin2hex(random_bytes(8))
+    );
+
+    $signature = sha1(
+        "public_id={$publicId}&timestamp={$timestamp}{$apiSecret}"
+    );
+
+    $endpoint = "https://api.cloudinary.com/v1_1/{$cloudName}/image/upload";
+
+    $postFields = [
+        'file' => new CURLFile(
+            $file['tmp_name'],
+            $validation['mime'],
+            basename($file['name'])
+        ),
+        'api_key' => $apiKey,
+        'timestamp' => $timestamp,
+        'public_id' => $publicId,
+        'signature' => $signature,
+    ];
+
+    $ch = curl_init($endpoint);
+
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $postFields,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 60,
+    ]);
+
+    $response = curl_exec($ch);
+
+    if ($response === false) {
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        return [
+            'valid' => false,
+            'error' => 'Cloudinary upload failed: ' . $error,
+        ];
     }
 
-    return ['valid' => true, 'filename' => $filename, 'path' => 'uploads/' . $filename];
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    $json = json_decode($response, true);
+
+    if ($httpCode >= 400 || !isset($json['secure_url'])) {
+        return [
+            'valid' => false,
+            'error' => $json['error']['message'] ?? 'Cloudinary upload failed.',
+        ];
+    }
+
+    return [
+        'valid' => true,
+        'filename' => $json['public_id'],
+        'path' => $json['secure_url'],
+    ];
 }
 
-function deleteUploadedFile(?string $relativePath): void
+function deleteUploadedFile(?string $publicId): void
 {
-    if (!$relativePath) {
+    if (empty($publicId)) {
         return;
     }
 
-    $fullPath = dirname(__DIR__) . '/' . ltrim(str_replace('uploads/', '', $relativePath), '/');
-    $uploadsRoot = realpath(dirname(__DIR__) . '/uploads');
+    $cloudName = getenv('CLOUDINARY_CLOUD_NAME');
+    $apiKey = getenv('CLOUDINARY_API_KEY');
+    $apiSecret = getenv('CLOUDINARY_API_SECRET');
 
-    if (!$uploadsRoot) {
+    if (!$cloudName || !$apiKey || !$apiSecret) {
+        error_log('Cloudinary credentials are missing.');
         return;
     }
 
-    $target = realpath(dirname(__DIR__) . '/uploads/' . basename($relativePath));
-    if ($target && str_starts_with($target, $uploadsRoot) && is_file($target)) {
-        unlink($target);
+    $timestamp = time();
+
+    $signature = sha1(
+        "public_id={$publicId}&timestamp={$timestamp}{$apiSecret}"
+    );
+
+    $endpoint = "https://api.cloudinary.com/v1_1/{$cloudName}/image/destroy";
+
+    $postFields = [
+        'public_id' => $publicId,
+        'api_key' => $apiKey,
+        'timestamp' => $timestamp,
+        'signature' => $signature,
+    ];
+
+    $ch = curl_init($endpoint);
+
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => http_build_query($postFields),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 30,
+    ]);
+
+    $response = curl_exec($ch);
+
+    if ($response === false) {
+        error_log('Cloudinary delete failed: ' . curl_error($ch));
+        curl_close($ch);
+        return;
+    }
+
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode >= 400) {
+        error_log('Cloudinary delete failed: ' . $response);
     }
 }
 
